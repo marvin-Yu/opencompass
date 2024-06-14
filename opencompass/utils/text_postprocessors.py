@@ -94,6 +94,8 @@ def first_option_postprocess(text: str, options: str, cushion=True) -> str:
         f'答案是\s?(\S+)(?:。|$)',
         f'答案应该是\s?(\S+)(?:。|$)',
         f'答案为\s?(\S+)(?:。|$)',
+        f'[Tt]he answer is:\\n\\n\(?([{options}])\)?',
+        f'[Tt]he answer is:\(?([{options}])\)?',
         f'[Tt]he answer is \(?([{options}])\)?',
         f'[Tt]he answer is option \(?([{options}])\)?',
         f'[Tt]he correct answer is \(?([{options}])\)?',

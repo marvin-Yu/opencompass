@@ -11,6 +11,7 @@ from .gemini_api import Gemini, GeminiAllesAPIN  # noqa: F401, F403
 from .glm import GLM130B  # noqa: F401, F403
 from .huggingface import HuggingFace  # noqa: F401, F403
 from .huggingface import HuggingFaceCausalLM  # noqa: F401, F403
+from .huggingface import XFTCausalLM  # noqa: F401, F403
 from .huggingface import HuggingFaceChatGLM3  # noqa: F401, F403
 from .hunyuan_api import Hunyuan  # noqa: F401
 from .intern_model import InternLM  # noqa: F401, F403

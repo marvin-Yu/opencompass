@@ -782,3 +782,73 @@ class HuggingFaceChatGLM3(HuggingFace):
 
     def get_token_len(self, prompt: str) -> int:
         return len(self.tokenizer.encode(prompt)) + self.num_extra_tokens
+
+
+@MODELS.register_module()
+class XFTCausalLM(HuggingFace):
+    """Model wrapper around HuggingFace CausalLM.
+
+    Args:
+        path (str): The name or path to HuggingFace's model.
+        hf_cache_dir: Set the cache dir to HF model cache dir. If None, it will
+            use the env variable HF_MODEL_HUB. Defaults to None.
+        max_seq_len (int): The maximum length of the input sequence. Defaults
+            to 2048.
+        tokenizer_path (str): The path to the tokenizer. Defaults to None.
+        tokenizer_kwargs (dict): Keyword arguments for the tokenizer.
+            Defaults to {}.
+        peft_path (str, optional): The name or path to the HuggingFace's PEFT
+            model. If None, the original model will not be converted to PEFT.
+            Defaults to None.
+        tokenizer_only (bool): If True, only the tokenizer will be initialized.
+            Defaults to False.
+        model_kwargs (dict): Keyword arguments for the model, used in loader.
+            Defaults to dict(device_map='auto').
+        meta_template (Dict, optional): The model's meta prompt
+            template if needed, in case the requirement of injecting or
+            wrapping of any meta instructions.
+        batch_padding (bool): If False, inference with be performed in for-loop
+            without batch padding.
+    """
+
+    def _load_model(self,
+                    path: str,
+                    model_kwargs: dict,
+                    peft_path: Optional[str] = None):
+        import xfastertransformer
+        self.model = xfastertransformer.AutoModel.from_pretrained(path, **model_kwargs)
+        self.model.device = "cpu"
+        self.model.generate_orig = self.model.generate
+        def _generate(*args, **kwargs):
+            if kwargs['max_new_tokens'] is not None:
+                kwargs['max_length'] = kwargs['input_ids'].shape[-1] + kwargs['max_new_tokens']
+            return self.model.generate_orig(*args, **kwargs)
+        self.model.generate = _generate
+
+
+    # keep same like HuggingFace.get_logits, but different at output
+    def get_logits(self, inputs: List[str]):
+        if self.batch_padding and len(inputs) > 1:
+            # batch inference
+            tokens = self.tokenizer(inputs,
+                                    padding=True,
+                                    truncation=True,
+                                    max_length=self.max_seq_len)
+
+            tokens = {
+                k: torch.tensor(np.array(tokens[k]), device=self.model.device)
+                for k in tokens if k in ['input_ids', 'attention_mask']
+            }
+            outputs = self.model(**tokens)
+
+        else:
+            input_ids = self.tokenizer(
+                inputs,
+                padding=False,
+                truncation=True,
+                max_length=self.max_seq_len)['input_ids']
+            input_ids = torch.tensor(input_ids, device=self.model.device)
+            tokens = {'input_ids': input_ids}
+
+            outputs = self.model(input_ids)
+        return outputs, {'tokens': tokens}
